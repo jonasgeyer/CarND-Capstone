@@ -3,6 +3,8 @@
 import rospy
 from geometry_msgs.msg import PoseStamped
 from styx_msgs.msg import Lane, Waypoint
+from scipy.spatial import KDTree
+import numpy as np
 
 import math
 
@@ -28,6 +30,12 @@ class WaypointUpdater(object):
     def __init__(self):
         rospy.init_node('waypoint_updater')
 
+        # TODO: Add other member variables you need below
+        self.pose = None
+        self.base_waypoints = None
+        self.waypoints_2d = None
+        self.waypoint_tree = None
+        
         rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
         rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
 
@@ -36,16 +44,62 @@ class WaypointUpdater(object):
 
         self.final_waypoints_pub = rospy.Publisher('final_waypoints', Lane, queue_size=1)
 
-        # TODO: Add other member variables you need below
+        self.loop()
+        #rospy.spin()
 
-        rospy.spin()
+    def loop(self):
+        # implemented based on "Waypoint Updater Partial Walkthrough"
+        rate = rospy.Rate(50)
+        while not rospy.is_shutdown():
+            if self.pose and self.base_waypoints and self.waypoints_2d and self.waypoint_tree:
+                # Get closest waypoint
+                closes_waypoint_idx = self.get_closest_waypoint_idx()
+                self.publish_waypoints(closes_waypoint_idx)
+            rate.sleep()
+        
+    def get_closest_waypoint_idx(self):
+        # implemented based on "Waypoint Updater Partial Walkthrough"
+        x = self.pose.pose.position.x
+        y = self.pose.pose.position.y
+        closest_idx = self.waypoint_tree.query([x,y], 1)[1]
+        
+        # Check if closest is ahead or behind vehicle
+        closest_coord = self.waypoints_2d[closest_idx]
+        num_points = len(self.waypoints_2d)
+        prev_idx = (closest_idx + num_points - 1) % num_points
+        prev_coord = self.waypoints_2d[prev_idx]
+        
+        # Equation for hyperplane through closest_coords
+        cl_vector = np.array(closest_coord)
+        prev_vector = np.array(prev_coord)
+        pos_vector = np.array([x, y])
+        
+        val = np.dot(cl_vector-prev_vector, pos_vector-cl_vector)
+        if val > 0.0:
+            closest_idx = (closest_idx + 1) % num_points
+        return closest_idx
+        
+    def publish_waypoints(self, closest_idx):
+        # implemented based on "Waypoint Updater Partial Walkthrough"
+        lane = Lane()
+        lane.header = self.base_waypoints.header
+        lane.waypoints = self.base_waypoints.waypoints[closest_idx:(closest_idx + LOOKAHEAD_WPS)] # FIXME: does this work cyclically? -> doesn't have to- when hitting the end of the waypoints then the car will stop anyway
+        self.final_waypoints_pub.publish(lane)
+        pass
 
     def pose_cb(self, msg):
         # TODO: Implement
+        # implemented based on "Waypoint Updater Partial Walkthrough"
+        self.pose = msg
         pass
 
     def waypoints_cb(self, waypoints):
         # TODO: Implement
+        # implemented based on "Waypoint Updater Partial Walkthrough"
+        self.base_waypoints = waypoints
+        if not self.waypoints_2d:
+            self.waypoints_2d = [[waypoint.pose.pose.position.x, waypoint.pose.pose.position.y] for waypoint in waypoints.waypoints]
+            self.waypoint_tree = KDTree(self.waypoints_2d)
         pass
 
     def traffic_cb(self, msg):
