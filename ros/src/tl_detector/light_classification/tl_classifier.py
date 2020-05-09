@@ -21,6 +21,10 @@ class TLClassifier(object):
 
         """
         #TODO implement light color prediction
+        
+        # filter for red pixels, based on:
+        # https://solarianprogrammer.com/2015/05/08/detect-red-circles-image-using-opencv/
+        
         hsv_image = cv2.cvtColor(image,cv2.COLOR_BGR2HSV)
     
         # Threshold the HSV image, keep only the red pixels
