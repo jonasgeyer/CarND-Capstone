@@ -60,18 +60,20 @@ class Controller(object):
             self.throttle_controller.reset()
             return 0.0, 0.0, 0.0
             
-        current_vel = self.vel_lpf.filt(current_vel)
+        filtered_vel = self.vel_lpf.filt(current_vel)
         
-        # rospy.logwarn("Angular vel: {0}".format(angular_vel))
-        # rospy.logwarn("Target velocity: {0}".format(linear_vel))
-        # rospy.logwarn("Target angular velocity: {0}\n".format(angular_vel))
-        # rospy.logwarn("Current velocity: {0}".format(current_vel))
-        # rospy.logwarn("Filtered velocity: {0}".format(self.vel_lpf.get()))
+        #rospy.logwarn("Angular vel: {0}".format(angular_vel))
+        #rospy.logwarn("Target velocity: {0}".format(linear_vel))
+        #rospy.logwarn("Target angular velocity: {0}\n".format(angular_vel))
+        #rospy.logwarn("Current velocity: {0}".format(current_vel))
+        #rospy.logwarn("Filtered velocity: {0}".format(filtered_vel))
         
-        steering = self.yaw_controller.get_steering(linear_vel, angular_vel, current_vel)
+        steer = self.yaw_controller.get_steering(linear_vel, angular_vel, filtered_vel)
+        rospy.logwarn("steer: {0}".format(steer))
         
-        vel_error = linear_vel - current_vel
-        self.last_vel = current_vel
+        
+        vel_error = linear_vel - filtered_vel
+        self.last_vel = filtered_vel
         
         current_time = rospy.get_time()
         sample_time = current_time - self.last_time
@@ -80,7 +82,7 @@ class Controller(object):
         throttle = self.throttle_controller.step(vel_error, sample_time)
         brake = 0
         
-        if linear_vel == 0.0 and current_vel < 0.1:
+        if linear_vel == 0.0 and filtered_vel < 0.1:
             throttle = 0.0
             brake = 800.0 # N*m - to hold the car in place if we are stopped at a light. Acceleration - 1m/s^2
         elif throttle < 0.1 and vel_error < 0:
@@ -88,6 +90,6 @@ class Controller(object):
             decel = max(vel_error, self.decel_limit)
             brake = abs(decel) * self.vehicle_mass*self.wheel_radius # Torque N*m
          
-        return throttle, braking, steering
+        return throttle, brake, steer
         
         
