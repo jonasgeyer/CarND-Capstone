@@ -15,5 +15,11 @@ if [ ! -f "$USER_PROFILE" ];
   else
     unity_path=$(cat "$USER_PROFILE")
 fi
+echo "Path:"
+echo $unity_path
+echo "this_dir"
+echo $THIS_DIR
+echo "USER_PROFILE"
+echo $USER_PROFILE
 
 $unity_path
